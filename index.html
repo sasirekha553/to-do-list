@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State-Driven To-Do List</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --text-muted: #888888;
+            --primary: #4a90e2;
+            --primary-hover: #357abd;
+            --danger: #e74c3c;
+            --danger-hover: #c0392b;
+            --border-color: #e0e0e0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            margin: 0;
+        }
+
+        .todo-container {
+            background: var(--card-bg);
+            width: 100%;
+            max-width: 500px;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        /* Form styling */
+        .todo-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .todo-input {
+            flex: 1;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .todo-input:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-add {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0 20px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-add:hover {
+            background-color: var(--primary-hover);
+        }
+
+        /* Filter Controls */
+        .filters {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+
+        .filter-btn {
+            background: none;
+            border: none;
+            padding: 6px 12px;
+            font-size: 14px;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            color: var(--text-main);
+            background-color: #eef2f5;
+        }
+
+        .filter-btn.active {
+            background-color: var(--primary);
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Todo List items */
+        .todo-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .todo-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            gap: 10px;
+        }
+
+        .todo-item:last-child {
+            border-bottom: none;
+        }
+
+        .todo-item-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .todo-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .todo-text {
+            font-size: 16px;
+            word-break: break-word;
+            flex: 1;
+        }
+
+        .todo-item.completed .todo-text {
+            text-decoration: line-through;
+            color: var(--text-muted);
+        }
+
+        /* Inline editing input */
+        .edit-input {
+            flex: 1;
+            padding: 6px 10px;
+            font-size: 16px;
+            border: 1px solid var(--primary);
+            border-radius: 4px;
+            outline: none;
+        }
+
+        /* Actions */
+        .todo-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-action {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .btn-edit {
+            color: var(--primary);
+        }
+
+        .btn-edit:hover {
+            background-color: #eef5fc;
+        }
+
+        .btn-delete {
+            color: var(--danger);
+        }
+
+        .btn-delete:hover {
+            background-color: #fdefee;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            margin: 20px 0;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="todo-container">
+        <h1>Task Manager</h1>
+        
+        <form class="todo-form" id="todoForm">
+            <input type="text" id="todoInput" class="todo-input" placeholder="What needs to be done?" required autocomplete="off">
+            <button type="submit" class="btn-add">Add</button>
+        </form>
+
+        <div class="filters" id="filterControls">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="active">Active</button>
+            <button class="filter-btn" data-filter="completed">Completed</button>
+        </div>
+
+        <ul class="todo-list" id="todoList"></ul>
+    </div>
+
+    <script>
+        // --- 1. STATE MANAGEMENT ---
+        let state = {
+            todos: [],
+            currentFilter: 'all'
+        };
+
+        // DOM Element Cache
+        const todoForm = document.getElementById('todoForm');
+        const todoInput = document.getElementById('todoInput');
+        const todoList = document.getElementById('todoList');
+        const filterControls = document.getElementById('filterControls');
+
+        // Load data initially from LocalStorage
+        function loadState() {
+            const savedTodos = localStorage.getItem('todos');
+            if (savedTodos) {
+                state.todos = JSON.parse(savedTodos);
+            }
+            render();
+        }
+
+        // Save current todos array to LocalStorage
+        function saveState() {
+            localStorage.setItem('todos', JSON.stringify(state.todos));
+        }
+
+        // --- 2. CRUD OPERATIONS (State Mutations) ---
+
+        function addTodo(text) {
+            const newTodo = {
+                id: Date.now().toString(), // Reliable unique ID
+                text: text.trim(),
+                completed: false
+            };
+            state.todos.push(newTodo);
+            saveState();
+            render();
+        }
+
+        function toggleTodoStatus(id) {
+            state.todos = state.todos.map(todo => {
+                if (todo.id === id) {
+                    return { ...todo, completed: !todo.completed };
+                }
+                return todo;
+            });
+            saveState();
+            render();
+        }
+
+        function updateTodoText(id, newText) {
+            if (!newText.trim()) {
+                deleteTodo(id); // If user deletes all text, remove the item
+                return;
+            }
+            state.todos = state.todos.map(todo => {
+                if (todo.id === id) {
+                    return { ...todo, text: newText.trim() };
+                }
+                return todo;
+            });
+            saveState();
+            render();
+        }
+
+        function deleteTodo(id) {
+            state.todos = state.todos.filter(todo => todo.id !== id);
+            saveState();
+            render();
+        }
+
+        // --- 3. RENDERING ENGINE (DOM Manipulation) ---
+
+        function render() {
+            // Apply filtering logic based on state
+            const filteredTodos = state.todos.filter(todo => {
+                if (state.currentFilter === 'active') return !todo.completed;
+                if (state.currentFilter === 'completed') return todo.completed;
+                return true; // 'all'
+            });
+
+            // Clear existing markup
+            todoList.innerHTML = '';
+
+            if (filteredTodos.length === 0) {
+                todoList.innerHTML = `<li class="empty-state">No tasks found here.</li>`;
+                return;
+            }
+
+            // Build dynamic DOM nodes
+            filteredTodos.forEach(todo => {
+                const li = document.createElement('li');
+                li.className = `todo-item ${todo.completed ? 'completed' : ''}`;
+                li.dataset.id = todo.id; // Store reference to state object key
+
+                li.innerHTML = `
+                    <div class="todo-item-left">
+                        <input type="checkbox" class="todo-checkbox" ${todo.completed ? 'checked' : ''}>
+                        <span class="todo-text">${escapeHTML(todo.text)}</span>
+                    </div>
+                    <div class="todo-actions">
+                        <button class="btn-action btn-edit">Edit</button>
+                        <button class="btn-action btn-delete">Delete</button>
+                    </div>
+                `;
+                todoList.appendChild(li);
+            });
+        }
+
+        // Helper to prevent XSS (Cross-Site Scripting) injection
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
+        // --- 4. EVENT HANDLING & DELEGATION ---
+
+        // Create Hook
+        todoForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (todoInput.value.trim() === '') return;
+            addTodo(todoInput.value);
+            todoInput.value = '';
+        });
+
+        // Event Delegation for List Element actions (Toggle, Update UI, Delete)
+        todoList.addEventListener('click', (e) => {
+            const target = e.target;
+            const itemRow = target.closest('.todo-item');
+            if (!itemRow) return;
+            const id = itemRow.dataset.id;
+
+            // Handle Checkbox / Toggle Read state
+            if (target.classList.contains('todo-checkbox')) {
+                toggleTodoStatus(id);
+            }
+
+            // Handle Delete Action
+            if (target.classList.contains('btn-delete')) {
+                deleteTodo(id);
+            }
+
+            // Handle Edit Transition
+            if (target.classList.contains('btn-edit')) {
+                transformToEditMode(itemRow, id);
+            }
+        });
+
+        // Inline Row DOM mutation strategy for Editing (U in CRUD)
+        function transformToEditMode(itemRow, id) {
+            const textSpan = itemRow.querySelector('.todo-text');
+            const currentText = textSpan.textContent;
+            const leftContainer = itemRow.querySelector('.todo-item-left');
+            const actionsContainer = itemRow.querySelector('.todo-actions');
+
+            // Replace standard span text with a focused text field input
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'edit-input';
+            input.value = currentText;
+            
+            leftContainer.replaceChild(input, textSpan);
+            input.focus();
+
+            // Hide action buttons during active editing
+            actionsContainer.style.display = 'none';
+
+            // Event closure to commit updates safely
+            const commitUpdate = () => {
+                updateTodoText(id, input.value);
+            };
+
+            // Listener bindings for confirming the change
+            input.addEventListener('blur', commitUpdate);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') commitUpdate();
+                if (e.key === 'Escape') render(); // Cancel and revert
+            });
+        }
+
+        // Filter Actions Delegation
+        filterControls.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('filter-btn')) return;
+
+            // Update UI class state visually
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+
+            // Mutate logic filter state and re-render
+            state.currentFilter = e.target.dataset.filter;
+            render();
+        });
+
+        // --- 5. INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', loadState);
+    </script>
+</body>
+</html>
